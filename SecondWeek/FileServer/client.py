@@ -12,11 +12,9 @@ socket.connect("tcp://localhost:5555")
 #Subida de archivo al servidor
 def uploadFile(fileName):
     if os.path.exists(fileName):
-        print('ok')
         file = open(fileName, 'rb')
         dataFile = file.read()
         sha256 = hashlib.sha256(dataFile).hexdigest()
-        print(sha256)
         socket.send_multipart(('upload'.encode("utf-8"), fileName.encode("utf-8"), dataFile, sha256.encode('utf-8')))
         message = socket.recv()
         if message.decode('utf-8') == 'ok':
@@ -39,8 +37,7 @@ def downloadFile(fileName):
     response = socket.recv_multipart()
     title = response[0].decode('utf-8')
     content = response[1]
-    print(content)
-    if title != b'' and content != b'':
+    if title != '' and content != b'':
         f = open(title, 'wb')
         f.write(content)
         f.close()

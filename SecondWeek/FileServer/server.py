@@ -24,10 +24,12 @@ def receiveFile(title, content, sha256file):
 
 #Retorna la lista de archivos que existe en el servidor
 def listFolder():
-    items = ''
+    items = 'Archivos en el servidor:'
     for (dirpath, dirnames, filenames) in os.walk("uploadedFiles"):
         for file in filenames:
-            items = items + file + '\n'
+            items = items + '\n' + file + '  --file'
+        for cd in dirnames:
+            items = items + '\n' + cd + ' --folder'
     socket.send_string(items)
 
 #Envia archivo desde el servidor al cliente
