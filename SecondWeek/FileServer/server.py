@@ -90,15 +90,15 @@ if not os.path.exists("uploadedFiles"):
     os.mkdir("uploadedFiles")
 while True:
     message = socket.recv_multipart()
-    accion = message[0]
-    if accion == b'upload':
+    accion = message[0].decode('utf-8')
+    if accion == 'upload':
         receiveFile(message[1].decode('utf-8'), message[2], message[3].decode('utf-8'), message[4].decode('utf-8'))
-    elif accion == b'list':
+    elif accion == 'list':
         listFolder()
-    elif accion == b'download':
+    elif accion == 'download':
         part = None
         if message[2].decode('utf-8') != '':
             part = int(message[2].decode('utf-8'))
         sendFile(message[1].decode('utf-8'), part)
-    print("Peticion recibida: %s" % message)
+    print("Peticion recibida: %s" % accion)
     time.sleep(1)

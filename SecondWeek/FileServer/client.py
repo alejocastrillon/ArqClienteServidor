@@ -5,8 +5,8 @@ import os.path
 import hashlib
 
 #head -c 1G </dev/urandom >myfile
-context = zmq.Context()
 
+context = zmq.Context()
 socket = context.socket(zmq.REQ)
 socket.connect("tcp://localhost:5555")
 PS = 1024*1024*2
@@ -56,7 +56,7 @@ def listFolder():
 def downloadFile(fileName):
     socket.send_multipart(('download'.encode('utf-8'), fileName.encode('utf-8'), ''.encode('utf-8')))
     length = int(socket.recv().decode('utf-8'))
-    print(length)
+    generalHash = hashlib.sha256()
     if length == 0:
         print('No existe el archivo')
     else:
@@ -65,7 +65,6 @@ def downloadFile(fileName):
             response = socket.recv_multipart()
             title = response[0].decode('utf-8')
             content = response[1]
-            generalHash = hashlib.sha256()
             if title != '' and content != b'':
                 if content != b'':
                     f = open(title, 'ab')
@@ -74,7 +73,7 @@ def downloadFile(fileName):
                     sha256 = hashlib.sha256(content).hexdigest()
                     generalHash.update(content)
                     if sha256 == response[2].decode('utf-8'):
-                        print("Descarga del archivo {title} exitosa parte {index}/{length}".format(title = title, index = index, length = length))
+                        print("Descarga del archivo {title} exitosa parte {index}/{length}".format(title = title, index = index + 1, length = length - 1))
                     else:
                         print("El archivo %s no existe en el servidor" % fileName)
                 else:
