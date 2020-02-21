@@ -19,7 +19,6 @@ def loadIndex():
     else:
         file = open('index.json')
         myIndex = json.load(file)
-        print('Content %s' % index)
         file.close()
     return myIndex
 
@@ -27,31 +26,33 @@ index = loadIndex()
 
 #Recibe el archivo y lo guarda en el servidor
 def receiveFile(title, content, sha256file, iterator):
-    print(index)
     if not(str(title) in index):
         index[str(title)] = []
         index[str(title)].append(sha256file)
     else:
         index[str(title)].append(sha256file)
 
-    file = open('index.json', 'w')
-    json.dump(index, file)
-    file.close()
-    if content != b'':
-        route = "uploadedFiles/{sha256file}".format(sha256file = sha256file)
-        f = open(route, 'wb')
-        f.write(content)
-        f.close()
-        f = open(route, 'rb')
-        sha256 = hashlib.sha256(f.read()).hexdigest()
-        f.close()
-        if sha256file == sha256:
-            socket.send_string('ok')
+    route = "uploadedFiles/{sha256file}".format(sha256file = sha256file)
+    if not(os.path.exists(route)):
+        file = open('index.json', 'w')
+        json.dump(index, file)
+        file.close()
+        if content != b'':
+            f = open(route, 'wb')
+            f.write(content)
+            f.close()
+            f = open(route, 'rb')
+            sha256 = hashlib.sha256(f.read()).hexdigest()
+            f.close()
+            if sha256file == sha256:
+                socket.send_string('ok')
+            else:
+                socket.send_string('error_file')
         else:
-            socket.send_string('error')
+            print('Finish')
+            socket.send_string('ok')
     else:
-        print('Finish')
-        socket.send_string('ok')
+        socket.send_string('error_file_created')
     
 
 #Retorna la lista de archivos que existe en el servidor
@@ -63,20 +64,30 @@ def listFolder():
     socket.send_string(items)
 
 #Envia archivo desde el servidor al cliente
-def sendFile(fileName):
-    route = "uploadedFiles/%s" % str(fileName)
-    if os.path.exists(route):
-        f = open(route, 'rb')
-        print('Existe')
-        dataFile = f.read()
-        sha256 = hashlib.sha256(dataFile).hexdigest()
-        socket.send_multipart((fileName.encode('utf-8'), dataFile, sha256.encode('utf-8')))
+def sendFile(fileName, part):
+    if fileName in index:
+        listObjects = index[fileName]
+        if part != None:
+            if part != len(listObjects) - 1:
+                route = "uploadedFiles/%s" % str(listObjects[part])
+                if os.path.exists(route):
+                    f = open(route, 'rb')
+                    print('Existe')
+                    dataFile = f.read()
+                    sha256 = hashlib.sha256(dataFile).hexdigest()
+                    socket.send_multipart((fileName.encode('utf-8'), dataFile, sha256.encode('utf-8')))
+                else:
+                    socket.send_multipart((''.encode('utf-8'), ''.encode('utf-8')))
+            else:
+                socket.send_multipart((''.encode('utf-8'), ''.encode('utf-8'), listObjects[part].encode('utf-8')))
+        else:
+            socket.send_string(str(len(listObjects)))
     else:
-        socket.send_multipart((''.encode('utf-8'), ''.encode('utf-8')))
+        socket.send_string('0')
+    
 
 if not os.path.exists("uploadedFiles"):
     os.mkdir("uploadedFiles")
-print(index)
 while True:
     message = socket.recv_multipart()
     accion = message[0]
@@ -85,6 +96,9 @@ while True:
     elif accion == b'list':
         listFolder()
     elif accion == b'download':
-        sendFile(message[1].decode('utf-8'))
+        part = None
+        if message[2].decode('utf-8') != '':
+            part = int(message[2].decode('utf-8'))
+        sendFile(message[1].decode('utf-8'), part)
     print("Peticion recibida: %s" % message)
     time.sleep(1)
