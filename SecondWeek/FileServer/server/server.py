@@ -4,11 +4,29 @@ import zmq
 import os
 import hashlib
 import json
+import socket
 
 context = zmq.Context()
-socket = context.socket(zmq.REP)
-socket.bind("tcp://*:5555")
+mySocket = context.socket(zmq.REP)
+mySocket.bind("tcp://*:5555")
 index = None
+
+
+def getIp(): 
+    try: 
+        hostIp = socket.gethostbyname(socket.gethostname()) 
+        return hostIp
+    except: 
+        print("Unable to get Hostname and IP") 
+
+def registerServer():
+    mySocket.connect("tcp://localhost:8888")
+    mySocket.send_multipart(('registry'.encode('utf-8'), str(getIp()).encode('utf-8'), 1000))
+    response = mySocket.recv().decode('utf-8')
+    if response == 'ok':
+        print('Servidor registrado')
+    else:
+        print('No se pudo registrar el servidor')
 
 def loadIndex():
     myIndex = {}
@@ -16,6 +34,7 @@ def loadIndex():
         file = open('index.json', 'w')
         data  = {}
         json.dump(data, file)
+        file.close()
     else:
         file = open('index.json')
         myIndex = json.load(file)
