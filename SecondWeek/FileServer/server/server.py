@@ -3,28 +3,31 @@ import time
 import zmq
 import os
 import hashlib
+import sys
 import json
 import socket
 
 context = zmq.Context()
 mySocket = context.socket(zmq.REP)
-mySocket.bind("tcp://*:5555")
 index = None
+port = None
 
 
 def getIp(): 
     try: 
-        hostIp = socket.gethostbyname(socket.gethostname()) 
+        hostIp = socket.gethostbyname(socket.getfqdn()) 
         return hostIp
     except: 
         print("Unable to get Hostname and IP") 
 
-def registerServer():
-    mySocket.connect("tcp://localhost:8888")
-    mySocket.send_multipart(('registry'.encode('utf-8'), str(getIp()).encode('utf-8'), 1000))
-    response = mySocket.recv().decode('utf-8')
+def registerServer(port, capacity):
+    proxySocket = zmq.Context().socket(zmq.REQ)
+    proxySocket.connect("tcp://localhost:8888")
+    proxySocket.send_multipart(('registry'.encode('utf-8'), "{host}:{port}".format(host = getIp(), port = port).encode('utf-8'), str(capacity).encode('utf-8')))
+    response = proxySocket.recv().decode('utf-8')
     if response == 'ok':
         print('Servidor registrado')
+        mySocket.bind("tcp://*:{port}".format(port = port))
     else:
         print('No se pudo registrar el servidor')
 
@@ -56,6 +59,8 @@ def receiveFile(title, content, sha256file, iterator):
         file = open('index.json', 'w')
         json.dump(index, file)
         file.close()
+        proxySocket = zmq.Context().socket(zmq.REQ)
+        proxySocket.connect("tcp://localhost:8888")
         if content != b'':
             f = open(route, 'wb')
             f.write(content)
@@ -64,14 +69,18 @@ def receiveFile(title, content, sha256file, iterator):
             sha256 = hashlib.sha256(f.read()).hexdigest()
             f.close()
             if sha256file == sha256:
-                socket.send_string('ok')
+                mySocket.send_string('ok')
+                proxySocket.send_multipart(('add_file'.encode('utf-8'), title.encode('utf-8'), sha256file.encode('utf-8'), "{host}:{port}".format(host = getIp(), port = port).encode('utf-8')))
+                proxySocket.recv_string()
             else:
-                socket.send_string('error_file')
+                mySocket.send_string('error_file')
         else:
             print('Finish')
-            socket.send_string('ok')
+            proxySocket.send_multipart(('add_file'.encode('utf-8'), title.encode('utf-8'), sha256file.encode('utf-8'), ''.encode('utf-8')))
+            proxySocket.recv_string()
+            mySocket.send_string('ok')
     else:
-        socket.send_string('error_file_created')
+        mySocket.send_string('error_file_created')
     
 
 #Retorna la lista de archivos que existe en el servidor
@@ -80,44 +89,41 @@ def listFolder():
     for x in index.keys():
         print(x)
         items = items + '\n' + x
-    socket.send_string(items)
+    mySocket.send_string(items)
 
 #Envia archivo desde el servidor al cliente
-def sendFile(fileName, part):
-    if fileName in index:
-        listObjects = index[fileName]
-        if part != None:
-            if part != len(listObjects) - 1:
-                route = "uploadedFiles/%s" % str(listObjects[part])
-                if os.path.exists(route):
-                    f = open(route, 'rb')
-                    print('Existe')
-                    dataFile = f.read()
-                    sha256 = hashlib.sha256(dataFile).hexdigest()
-                    socket.send_multipart((fileName.encode('utf-8'), dataFile, sha256.encode('utf-8')))
-                else:
-                    socket.send_multipart((''.encode('utf-8'), ''.encode('utf-8')))
-            else:
-                socket.send_multipart((''.encode('utf-8'), ''.encode('utf-8'), listObjects[part].encode('utf-8')))
-        else:
-            socket.send_string(str(len(listObjects)))
+def sendFile(sha256):
+    route = "uploadedFiles/%s" % str(sha256)
+    if os.path.exists(route):
+        f = open(route, 'rb')
+        print('Existe')
+        dataFile = f.read()
+        sha256 = hashlib.sha256(dataFile).hexdigest()
+        mySocket.send_multipart((dataFile, sha256.encode('utf-8')))
     else:
-        socket.send_string('0')
-    
+        mySocket.send_multipart((''.encode('utf-8'), ''.encode('utf-8')))
+
+if len(sys.argv) != 3:
+    sys.stderr.write("Se debe usar: python server.py [port] [capacity]")
+    raise SystemExit(1)
+
+hostname = socket.gethostname()    
+IPAddr = socket.gethostbyname(hostname)    
+print("Your Computer Name is:" + hostname)    
+print("Your Computer IP Address is:" + IPAddr)
+port = sys.argv[1]
+registerServer(sys.argv[1], sys.argv[2])
 
 if not os.path.exists("uploadedFiles"):
     os.mkdir("uploadedFiles")
 while True:
-    message = socket.recv_multipart()
+    message = mySocket.recv_multipart()
     accion = message[0].decode('utf-8')
     if accion == 'upload':
         receiveFile(message[1].decode('utf-8'), message[2], message[3].decode('utf-8'), message[4].decode('utf-8'))
     elif accion == 'list':
         listFolder()
     elif accion == 'download':
-        part = None
-        if message[2].decode('utf-8') != '':
-            part = int(message[2].decode('utf-8'))
-        sendFile(message[1].decode('utf-8'), part)
+        sendFile(message[1].decode('utf-8'))
     print("Peticion recibida: %s" % accion)
     time.sleep(1)

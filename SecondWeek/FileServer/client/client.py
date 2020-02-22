@@ -3,21 +3,32 @@ import zmq
 import sys
 import os.path
 import hashlib
+import random
+import json
 
 #head -c 1G </dev/urandom >myfile
 
 context = zmq.Context()
 socket = context.socket(zmq.REQ)
 socket.connect("tcp://localhost:5555")
+
+proxySocket = zmq.Context().socket(zmq.REQ)
+proxySocket.connect("tcp://localhost:8888")
 PS = 1024*1024*2
 
 #Subida de archivo al servidor
 def uploadFile(fileName):
     if os.path.exists(fileName):
         generalHash = hashlib.sha256()
+        proxySocket.send_multipart(('index'.encode('utf-8'), ''.encode('utf-8')))
+        servers = json.loads(proxySocket.recv_json())
         file = open(fileName, 'rb')
         iterator = 0
+        iteratorServer = 0
         while True:
+            if iteratorServer == len(servers):
+                iteratorServer = 0
+            socket.connect("tcp://{host}".format(host = servers[iteratorServer]['host']))
             file.seek(iterator * PS)
             dataFile = file.read(PS)
             if not dataFile:
@@ -42,6 +53,7 @@ def uploadFile(fileName):
                 elif message.decode('utf-8') == 'error_file_created':
                     print('El archivo ya existe')
                     break
+            iteratorServer += 1
     else:
         sys.stderr.write("El archivo %s no existe \n" % fileName)
         raise SystemExit(1)
@@ -54,35 +66,35 @@ def listFolder():
 
 #Descarga de archivo del servidor al cliente
 def downloadFile(fileName):
-    socket.send_multipart(('download'.encode('utf-8'), fileName.encode('utf-8'), ''.encode('utf-8')))
-    length = int(socket.recv().decode('utf-8'))
+    proxySocket.send_multipart(('download'.encode('utf-8'), fileName.encode('utf-8')))
+    files = json.loads(proxySocket.recv_json())
+    print(len(files))
+    #socket.send_multipart(('download'.encode('utf-8'), fileName.encode('utf-8'), ''.encode('utf-8')))
+    #length = int(socket.recv().decode('utf-8'))
     generalHash = hashlib.sha256()
-    if length == 0:
+    if len(files) == 0:
         print('No existe el archivo')
     else:
-        for index in range(0, length):
-            socket.send_multipart(('download'.encode('utf-8'), fileName.encode('utf-8'), str(index).encode('utf-8')))
-            response = socket.recv_multipart()
-            title = response[0].decode('utf-8')
-            content = response[1]
-            if title != '' and content != b'':
-                if content != b'':
-                    f = open(title, 'ab')
-                    f.write(content)
-                    f.close()
-                    sha256 = hashlib.sha256(content).hexdigest()
-                    generalHash.update(content)
-                    if sha256 == response[2].decode('utf-8'):
-                        print("Descarga del archivo {title} exitosa parte {index}/{length}".format(title = title, index = index + 1, length = length - 1))
-                    else:
-                        print("El archivo %s no existe en el servidor" % fileName)
-                else:
-                    print('Descarga del archivo %s exitosa' % fileName)
-            else:
-                if generalHash.hexdigest() == response[2].decode('utf-8'):
-                    print("Descarga del archivo %s exitosa" % title)
+        for file in files:
+            if file['host'] != '':
+                socket.connect("tcp://{host}".format(host = file['host']))
+                socket.send_multipart(('download'.encode('utf-8'), file['sha256file'].encode('utf-8')))
+                response = socket.recv_multipart()
+                content = response[0]
+                f = open(fileName, 'ab')
+                f.write(content)
+                f.close()
+                sha256 = hashlib.sha256(content).hexdigest()
+                generalHash.update(content)
+                if sha256 == response[1].decode('utf-8'):
+                    print("Descarga del archivo {title} exitosa parte {index}/{length}".format(title = fileName, index = files.index(file) + 1, length = len(files) - 1))
                 else:
                     print("El archivo %s no existe en el servidor" % fileName)
+            else:
+                if generalHash.hexdigest() == file['sha256file']:
+                    print("Descarga del archivo exitosa")
+                else:
+                    print("Archivo corrupto")
 
 if len(sys.argv) < 2:
     sys.stderr.write("Se debe usar: python client.py [accion] [nombre_archivo]")
