@@ -34,12 +34,6 @@ def registerServer(host, port):
 
 #Recibe el archivo y lo guarda en el servidor
 def receiveFile(title, content, sha256file, iterator):
-    if not(str(title) in index):
-        index[str(title)] = []
-        index[str(title)].append(sha256file)
-    else:
-        index[str(title)].append(sha256file)
-
     route = "uploadedFiles/{sha256file}".format(sha256file = sha256file)
     if not(os.path.exists(route)):
         proxySocket = zmq.Context().socket(zmq.REQ)
@@ -60,15 +54,6 @@ def receiveFile(title, content, sha256file, iterator):
             mySocket.send_string('ok')
     else:
         mySocket.send_string('error_file_created')
-    
-
-#Retorna la lista de archivos que existe en el servidor
-def listFolder():
-    items = 'Archivos en el servidor:'
-    for x in index.keys():
-        print(x)
-        items = items + '\n' + x
-    mySocket.send_string(items)
 
 #Envia archivo desde el servidor al cliente
 def sendFile(sha256):
@@ -101,8 +86,6 @@ while True:
     accion = message[0].decode('utf-8')
     if accion == 'upload':
         receiveFile(message[1].decode('utf-8'), message[2], message[3].decode('utf-8'), message[4].decode('utf-8'))
-    elif accion == 'list':
-        listFolder()
     elif accion == 'download':
         sendFile(message[1].decode('utf-8'))
     print("Peticion recibida: %s" % accion)
