@@ -80,9 +80,6 @@ def listFolder():
 def downloadFile(fileName):
     proxySocket.send_multipart(('download'.encode('utf-8'), fileName.encode('utf-8')))
     files = json.loads(proxySocket.recv_json())
-    print(len(files))
-    #socket.send_multipart(('download'.encode('utf-8'), fileName.encode('utf-8'), ''.encode('utf-8')))
-    #length = int(socket.recv().decode('utf-8'))
     generalHash = hashlib.sha256()
     if len(files) == 0:
         print('No existe el archivo')
