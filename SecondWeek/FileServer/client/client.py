@@ -20,6 +20,8 @@ PS = 1024*1024*2
 def uploadFile(fileName):
     if os.path.exists(fileName):
         generalHash = hashlib.sha256()
+        dataIndex = {}
+        dataIndex[str(fileName)] = []
         proxySocket.send_multipart(('index'.encode('utf-8'), ''.encode('utf-8')))
         servers = json.loads(proxySocket.recv_json())
         file = open(fileName, 'rb')
@@ -35,6 +37,13 @@ def uploadFile(fileName):
                 socket.send_multipart(('upload'.encode("utf-8"), fileName.encode("utf-8"), b'', generalHash.hexdigest().encode('utf-8'), str(iterator).encode('utf-8')))
                 message = socket.recv()
                 if message.decode('utf-8') == 'ok':
+                    obj = {}
+                    obj['host'] = ''
+                    obj['sha256file'] = generalHash.hexdigest()
+                    dataIndex[str(fileName)].append(obj)
+                    print(dataIndex)
+                    proxySocket.send_multipart(('add_file'.encode('utf'), fileName.encode('utf-8'), json.dumps(dataIndex).encode('utf-8')))
+                    proxySocket.recv_string()
                     print('Subida del archivo {fileName} exitosa'.format(fileName = fileName))
                 else:
                     print("No se pudo subir el archivo %s" % fileName)
@@ -45,6 +54,10 @@ def uploadFile(fileName):
                 socket.send_multipart(('upload'.encode("utf-8"), fileName.encode("utf-8"), dataFile, sha256.encode('utf-8'), str(iterator).encode('utf-8')))
                 message = socket.recv()
                 if message.decode('utf-8') == 'ok':
+                    obj = {}
+                    obj['host'] = servers[iteratorServer]['host']
+                    obj['sha256file'] = sha256
+                    dataIndex[str(fileName)].append(obj)
                     print('Subida del archivo {fileName} parte {iterator} exitosa'.format(fileName = fileName, iterator = iterator))
                     iterator += 1
                 elif message.decode('utf-8') == 'error_file':

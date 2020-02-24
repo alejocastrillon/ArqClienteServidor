@@ -37,18 +37,10 @@ def loadIndex():
 index = loadIndex()
 indexServers = loadIndexServers()
 
-def addFile(title, sha256file, host):
+def addFile(title, listObject):
     index = loadIndex()
-    obj = {}
-    if not(str(title) in index):
-        index[str(title)] = []
-        obj['host'] = host
-        obj['sha256file'] = sha256file
-        index[str(title)].append(obj)
-    else:
-        obj['host'] = host
-        obj['sha256file'] = sha256file
-        index[str(title)].append(obj)
+    obj = json.loads(listObject)
+    index[str(title)] = obj[title]
     file = open('index.json', 'w')
     json.dump(index, file)
     file.close()
@@ -93,7 +85,7 @@ while True:
     elif accion == 'index':
         returnServerEnableList()
     elif accion == 'add_file':
-        addFile(message[1].decode('utf-8'), message[2].decode('utf-8'), message[3].decode('utf-8'))
+        addFile(message[1].decode('utf-8'), message[2].decode('utf-8'))
     elif accion == 'download':
         downloadFile(message[1].decode('utf-8'))
     print(message)

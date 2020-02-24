@@ -70,14 +70,10 @@ def receiveFile(title, content, sha256file, iterator):
             f.close()
             if sha256file == sha256:
                 mySocket.send_string('ok')
-                proxySocket.send_multipart(('add_file'.encode('utf-8'), title.encode('utf-8'), sha256file.encode('utf-8'), "{host}:{port}".format(host = getIp(), port = port).encode('utf-8')))
-                proxySocket.recv_string()
             else:
                 mySocket.send_string('error_file')
         else:
             print('Finish')
-            proxySocket.send_multipart(('add_file'.encode('utf-8'), title.encode('utf-8'), sha256file.encode('utf-8'), ''.encode('utf-8')))
-            proxySocket.recv_string()
             mySocket.send_string('ok')
     else:
         mySocket.send_string('error_file_created')
@@ -101,6 +97,7 @@ def sendFile(sha256):
         sha256 = hashlib.sha256(dataFile).hexdigest()
         mySocket.send_multipart((dataFile, sha256.encode('utf-8')))
     else:
+        print('No existe %s' % str(sha256))
         mySocket.send_multipart((''.encode('utf-8'), ''.encode('utf-8')))
 
 if len(sys.argv) != 3:
