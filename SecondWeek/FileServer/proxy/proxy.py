@@ -9,6 +9,7 @@ socket.bind("tcp://*:8888")
 indexServers = None
 index = None
 
+#Carga el archivo de indice de los servidores registrados
 def loadIndexServers():
     index = []
     if not os.path.exists('indexservers.json'):
@@ -21,6 +22,7 @@ def loadIndexServers():
         file.close
     return index
 
+#Carga el archivo de indice de los archivos subidos
 def loadIndex():
     myIndex = {}
     if not os.path.exists('index.json'):
@@ -37,6 +39,7 @@ def loadIndex():
 index = loadIndex()
 indexServers = loadIndexServers()
 
+#Agrega al indice de archivos un archivo subido con su sha
 def addFile(title, listObject):
     index = loadIndex()
     obj = json.loads(listObject)
@@ -47,6 +50,7 @@ def addFile(title, listObject):
     socket.send_string('ok')
     index = loadIndex()
 
+#Envia las rutas donde están las partes del archivo
 def downloadFile(fileName):
     index = loadIndex()
     if fileName in index:
@@ -55,12 +59,13 @@ def downloadFile(fileName):
     else:
         socket.send_string('0')
 
-def registryServer(host, capacity):
-    if host != None and capacity != None:
+#Registra el servidor como un nodo
+def registryServer(host):
+    if host != None:
         if not(existsServer(host)):
             obj = {}
             obj["host"] = host
-            obj["capacity"] = capacity
+            #obj["capacity"] = capacity
             indexServers.append(obj)
             file = open('indexservers.json', 'w')
             json.dump(indexServers, file)
@@ -68,9 +73,11 @@ def registryServer(host, capacity):
     else:
         socket.send_string('error')
 
+#Retorna el indice de servidores
 def returnServerEnableList():
     socket.send_json(json.dumps(indexServers))
 
+#Determina si un servidor está registrado
 def existsServer(host):
     for detail in indexServers:
         if detail['host'] == host:
@@ -81,7 +88,7 @@ while True:
     message = socket.recv_multipart()
     accion = message[0].decode('utf-8')
     if accion == 'registry':
-        registryServer(message[1].decode('utf-8'), int(message[2].decode('utf-8')))
+        registryServer(message[1].decode('utf-8'))
     elif accion == 'index':
         returnServerEnableList()
     elif accion == 'add_file':

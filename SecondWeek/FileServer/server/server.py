@@ -9,42 +9,28 @@ import socket
 
 context = zmq.Context()
 mySocket = context.socket(zmq.REP)
-index = None
+host = None
 port = None
 
-
-def getIp(): 
+#Conseguir ip del servidor
+""" def getIp(): 
     try: 
         hostIp = socket.gethostbyname(socket.getfqdn()) 
         return hostIp
     except: 
-        print("Unable to get Hostname and IP") 
+        print("Unable to get Hostname and IP")  """
 
-def registerServer(port, capacity):
+#Registro del servidor
+def registerServer(host, port):
     proxySocket = zmq.Context().socket(zmq.REQ)
     proxySocket.connect("tcp://localhost:8888")
-    proxySocket.send_multipart(('registry'.encode('utf-8'), "{host}:{port}".format(host = getIp(), port = port).encode('utf-8'), str(capacity).encode('utf-8')))
+    proxySocket.send_multipart(('registry'.encode('utf-8'), "{host}:{port}".format(host = host, port = port).encode('utf-8')))
     response = proxySocket.recv().decode('utf-8')
     if response == 'ok':
         print('Servidor registrado')
         mySocket.bind("tcp://*:{port}".format(port = port))
     else:
         print('No se pudo registrar el servidor')
-
-def loadIndex():
-    myIndex = {}
-    if not os.path.exists('index.json'):
-        file = open('index.json', 'w')
-        data  = {}
-        json.dump(data, file)
-        file.close()
-    else:
-        file = open('index.json')
-        myIndex = json.load(file)
-        file.close()
-    return myIndex
-
-index = loadIndex()
 
 #Recibe el archivo y lo guarda en el servidor
 def receiveFile(title, content, sha256file, iterator):
@@ -56,9 +42,6 @@ def receiveFile(title, content, sha256file, iterator):
 
     route = "uploadedFiles/{sha256file}".format(sha256file = sha256file)
     if not(os.path.exists(route)):
-        file = open('index.json', 'w')
-        json.dump(index, file)
-        file.close()
         proxySocket = zmq.Context().socket(zmq.REQ)
         proxySocket.connect("tcp://localhost:8888")
         if content != b'':
@@ -101,14 +84,14 @@ def sendFile(sha256):
         mySocket.send_multipart((''.encode('utf-8'), ''.encode('utf-8')))
 
 if len(sys.argv) != 3:
-    sys.stderr.write("Se debe usar: python server.py [port] [capacity]")
+    sys.stderr.write("Se debe usar: python server.py [ip] [port]")
     raise SystemExit(1)
 
 hostname = socket.gethostname()    
 IPAddr = socket.gethostbyname(hostname)    
 print("Your Computer Name is:" + hostname)    
 print("Your Computer IP Address is:" + IPAddr)
-port = sys.argv[1]
+port = sys.argv[2]
 registerServer(sys.argv[1], sys.argv[2])
 
 if not os.path.exists("uploadedFiles"):
