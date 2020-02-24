@@ -36,6 +36,15 @@ def loadIndex():
         file.close()
     return myIndex
 
+
+#Retorna la lista de archivos que existe en el servidor
+def listFolder():
+    items = 'Archivos en el servidor:'
+    for x in index.keys():
+        print(x)
+        items = items + '\n' + x
+    socket.send_string(items)
+
 index = loadIndex()
 indexServers = loadIndexServers()
 
@@ -95,4 +104,6 @@ while True:
         addFile(message[1].decode('utf-8'), message[2].decode('utf-8'))
     elif accion == 'download':
         downloadFile(message[1].decode('utf-8'))
+    elif accion == 'list':
+        listFolder()
     print(message)

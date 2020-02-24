@@ -72,8 +72,8 @@ def uploadFile(fileName):
 
 #Peticion de listar archivos del servidor
 def listFolder():
-    socket.send_multipart(('list'.encode("utf-8"), b''))
-    message = socket.recv()
+    proxySocket.send_multipart(('list'.encode("utf-8"), b''))
+    message = proxySocket.recv()
     print(message.decode('utf-8'))
 
 #Descarga de archivo del servidor al cliente
