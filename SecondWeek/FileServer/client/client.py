@@ -28,6 +28,7 @@ def uploadFile(fileName):
         while True:
             if iteratorServer == len(servers):
                 iteratorServer = 0
+            obj = {}
             socket.connect("tcp://{host}".format(host = servers[iteratorServer]['host']))
             file.seek(iterator * PS)
             dataFile = file.read(PS)
@@ -35,11 +36,9 @@ def uploadFile(fileName):
                 socket.send_multipart(('upload'.encode("utf-8"), fileName.encode("utf-8"), b'', generalHash.hexdigest().encode('utf-8'), str(iterator).encode('utf-8')))
                 message = socket.recv()
                 if message.decode('utf-8') == 'ok':
-                    obj = {}
                     obj['host'] = ''
                     obj['sha256file'] = generalHash.hexdigest()
                     dataIndex.append(obj)
-                    print(dataIndex)
                     proxySocket.send_multipart(('add_file'.encode('utf'), fileName.encode('utf-8'), json.dumps(dataIndex).encode('utf-8')))
                     proxySocket.recv_string()
                     print('Subida del archivo {fileName} exitosa'.format(fileName = fileName))
@@ -52,7 +51,6 @@ def uploadFile(fileName):
                 socket.send_multipart(('upload'.encode("utf-8"), fileName.encode("utf-8"), dataFile, sha256.encode('utf-8'), str(iterator).encode('utf-8')))
                 message = socket.recv()
                 if message.decode('utf-8') == 'ok':
-                    obj = {}
                     obj['host'] = servers[iteratorServer]['host']
                     obj['sha256file'] = sha256
                     dataIndex.append(obj)
