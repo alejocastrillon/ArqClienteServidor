@@ -19,8 +19,7 @@ PS = 1024*1024*2
 def uploadFile(fileName):
     if os.path.exists(fileName):
         generalHash = hashlib.sha256()
-        dataIndex = {}
-        dataIndex[str(fileName)] = []
+        dataIndex = []
         proxySocket.send_multipart(('index'.encode('utf-8'), ''.encode('utf-8')))
         servers = json.loads(proxySocket.recv_json())
         file = open(fileName, 'rb')
@@ -39,7 +38,7 @@ def uploadFile(fileName):
                     obj = {}
                     obj['host'] = ''
                     obj['sha256file'] = generalHash.hexdigest()
-                    dataIndex[str(fileName)].append(obj)
+                    dataIndex.append(obj)
                     print(dataIndex)
                     proxySocket.send_multipart(('add_file'.encode('utf'), fileName.encode('utf-8'), json.dumps(dataIndex).encode('utf-8')))
                     proxySocket.recv_string()
@@ -56,7 +55,7 @@ def uploadFile(fileName):
                     obj = {}
                     obj['host'] = servers[iteratorServer]['host']
                     obj['sha256file'] = sha256
-                    dataIndex[str(fileName)].append(obj)
+                    dataIndex.append(obj)
                     print('Subida del archivo {fileName} parte {iterator} exitosa'.format(fileName = fileName, iterator = iterator))
                     iterator += 1
                 elif message.decode('utf-8') == 'error_file':

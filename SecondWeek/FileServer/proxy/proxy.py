@@ -51,8 +51,7 @@ indexServers = loadIndexServers()
 #Agrega al indice de archivos un archivo subido con su sha
 def addFile(title, listObject):
     index = loadIndex()
-    obj = json.loads(listObject)
-    index[str(title)] = obj[title]
+    index[str(title)] = json.loads(listObject)
     file = open('index.json', 'w')
     json.dump(index, file)
     file.close()
