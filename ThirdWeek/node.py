@@ -6,11 +6,18 @@ import json
 import random
 import string
 import socket
+import getmac
+
+class Node:
+
+    def __init__(self, host, ident, next):
+        self.host = host
+        self.ident = ident
+        self.next = next
 
 serverSocket = zmq.Context().socket(zmq.REP)
-port = None
-hostConnection = None
-ringServers = None
+nextServer = zmq.Context().socket(zmq.REQ)
+node = None
 
 def getIp(): 
     try: 
@@ -24,86 +31,49 @@ def getDistributedString():
     chars.extend(string.ascii_lowercase)
     chars.extend(string.ascii_uppercase)
     chars.extend(string.digits)
-    return ''.join(random.choice(chars) for x in range(25))
+    return getmac.get_mac_address() + ''.join(random.choice(chars) for x in range(25))
 
 def hashString(string):
     return hashlib.sha256(string.encode()).hexdigest()[:8]
 
-def loadRing():
-    index = []
-    if not os.path.exists('ringservers.json'):
-        file = open('ringservers.json', 'w')
-        json.dump(index, file)
-        file.close()
-    else:
-        file = open('ringservers.json')
-        index = json.load(file)
-        print(index.sort())
-        file.close()
-    return index
-
-ringServers = loadRing()
-
 def integerHash(hash):
     return int(hash, 16)
 
-def receiveRequestConnection(connectingHost):
-    print('llego')
-    ringServers = loadRing()
-    iden = integerHash(hashString(getDistributedString()))
-    ringServers[str(iden)] = {
-        "host": "{}".format(connectingHost)
-    }
-    file = open('ringservers.json', 'w')
-    json.dump(ringServers, file)
-    file.close()
-    ringServers = loadRing()
-    serverSocket.send_string(str(iden))
+def initializeNode(port):
+    print(port)
+    ident = integerHash(hashString(getDistributedString()))
+    host = "tcp://{ip}:{port}".format(ip = getIp(), port = port)
+    node = Node(host, ident, None)
+    print("Inicializado nodo con id: %s" % node.ident)
+    serverSocket.bind("tcp://*:{}".format(port))
 
-def sendRequestConnection(hostConnect):
-    print('entro')
+def receiveRequestConnection(connectingHost, hostId):
+    print(connectingHost)
+    hostId = int(hostId, 10)
+    print(hostId)
+
+def sendRequestConnection(hostConnect, port):
+    print(hostConnect)
     socketConnection = zmq.Context().socket(zmq.REQ)
     socketConnection.connect("tcp://{}".format(hostConnect))
     host = "{h}:{p}".format(h = getIp(), p = port)
-    socketConnection.send_multipart(('connect'.encode('utf-8'), host.encode('utf-8')))
+    socketConnection.send_multipart(('connect'.encode('utf-8'), host.encode('utf-8'), str(integerHash(hashString(getDistributedString()))).encode('utf-8')))
     iden = socketConnection.recv_string()
 
 if not os.path.exists("uploadedFiles"):
     os.mkdir("uploadedFiles")    
 
-if len(sys.argv) <= 2:
-    sys.stderr.write("Se debe especificar una acción\n")
-    raise SystemExit(1)
-else:
-    accion = sys.argv[1]
-    if accion == "principal":
-        if len(sys.argv) == 3:
-            port = sys.argv[2]
-            serverSocket.bind("tcp://*:{}".format(port))
-            ringServers = loadRing()
-            ringServers[str(integerHash(hashString(getDistributedString())))] = {
-                "host": "{h}:{p}".format(h = getIp(), p = port)
-            }
-            file = open('ringservers.json', 'w')
-            json.dump(ringServers, file)
-            file.close()
-            ringServers = loadRing()
-            print(integerHash(hashString(getDistributedString())))
-        else:
-            sys.stderr.write("Se debe especificar el host")
-            raise SystemError(1)
-    elif accion == "connect":
-        if len(sys.argv) != 4:
-            sys.stderr.write("Se debe usar: python node.py connect [port] [host]")
-            raise SystemExit(1)
-        else:
-            port = sys.argv[2]
-            sendRequestConnection(sys.argv[3])
+if len(sys.argv) == 2:
+    initializeNode(sys.argv[1])
+elif len(sys.argv) == 4:
+    if sys.argv[2] == 'connect':
+        sendRequestConnection(sys.argv[3], sys.argv[1])
 
 while True:
     message = serverSocket.recv_multipart()
+    print(message)
     action = message[0].decode('utf-8')
     if action == 'connect':
-        receiveRequestConnection(message[1].decode('utf-8'))
+        receiveRequestConnection(message[1].decode('utf-8'), message[2].decode('utf-8'))
     else:
         pass
