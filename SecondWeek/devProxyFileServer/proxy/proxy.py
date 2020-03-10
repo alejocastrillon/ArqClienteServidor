@@ -2,13 +2,6 @@ import zmq
 import os
 import json
 
-context = zmq.Context()
-socket = context.socket(zmq.REP)
-socket.bind("tcp://*:8888")
-
-indexServers = None
-index = None
-
 #Carga el archivo de indice de los servidores registrados
 def loadIndexServers():
     index = []
@@ -38,18 +31,14 @@ def loadIndex():
 
 
 #Retorna la lista de archivos que existe en el servidor
-def listFolder():
+def listFolder(index, socket):
     items = 'Archivos en el servidor:'
     for x in index.keys():
-        print(x)
         items = items + '\n' + x
     socket.send_string(items)
 
-index = loadIndex()
-indexServers = loadIndexServers()
-
 #Agrega al indice de archivos un archivo subido con su sha
-def addFile(title, listObject):
+def addFile(title, listObject, socket):
     index = loadIndex()
     index[str(title)] = json.loads(listObject)
     file = open('index.json', 'w')
@@ -59,7 +48,7 @@ def addFile(title, listObject):
     index = loadIndex()
 
 #Envia las rutas donde están las partes del archivo
-def downloadFile(fileName):
+def downloadFile(fileName, socket):
     index = loadIndex()
     if fileName in index:
         listObjects = index[fileName]
@@ -68,12 +57,11 @@ def downloadFile(fileName):
         socket.send_string('0')
 
 #Registra el servidor como un nodo
-def registryServer(host):
+def registryServer(host, indexServers, socket):
     if host != None:
-        if not(existsServer(host)):
+        if not(existsServer(host, indexServers)):
             obj = {}
             obj["host"] = host
-            #obj["capacity"] = capacity
             indexServers.append(obj)
             file = open('indexservers.json', 'w')
             json.dump(indexServers, file)
@@ -82,27 +70,35 @@ def registryServer(host):
         socket.send_string('error')
 
 #Retorna el indice de servidores
-def returnServerEnableList():
+def returnServerEnableList(indexServers, socket):
     socket.send_json(json.dumps(indexServers))
 
 #Determina si un servidor está registrado
-def existsServer(host):
+def existsServer(host, indexServers):
     for detail in indexServers:
         if detail['host'] == host:
             return True
     return False
 
-while True:
-    message = socket.recv_multipart()
-    accion = message[0].decode('utf-8')
-    if accion == 'registry':
-        registryServer(message[1].decode('utf-8'))
-    elif accion == 'index':
-        returnServerEnableList()
-    elif accion == 'add_file':
-        addFile(message[1].decode('utf-8'), message[2].decode('utf-8'))
-    elif accion == 'download':
-        downloadFile(message[1].decode('utf-8'))
-    elif accion == 'list':
-        listFolder()
-    print(message)
+def main():
+    context = zmq.Context()
+    socket = context.socket(zmq.REP)
+    socket.bind("tcp://*:8888")
+    index = loadIndex()
+    indexServers = loadIndexServers()
+    while True:
+        message = socket.recv_multipart()
+        accion = message[0].decode('utf-8')
+        if accion == 'registry':
+            registryServer(message[1].decode('utf-8'), indexServers, socket)
+        elif accion == 'index':
+            returnServerEnableList(indexServers, socket)
+        elif accion == 'add_file':
+            addFile(message[1].decode('utf-8'), message[2].decode('utf-8'), socket)
+        elif accion == 'download':
+            downloadFile(message[1].decode('utf-8'), socket)
+        elif accion == 'list':
+            listFolder(index, socket)
+
+if __name__ == "__main__":
+    main()

@@ -7,16 +7,17 @@ import random
 import json
 
 #head -c 1G </dev/urandom >myfile
-
-context = zmq.Context()
-socket = context.socket(zmq.REQ)
-
-proxySocket = zmq.Context().socket(zmq.REQ)
-proxySocket.connect("tcp://localhost:8888")
 PS = 1024*1024*2
 
+
+def clear(): 
+    if os.name == 'nt': 
+        _ = os.system('cls') 
+    else: 
+        _ = os.system('clear') 
+
 #Subida de archivo al servidor
-def uploadFile(fileName):
+def uploadFile(fileName, proxySocket, socket):
     if os.path.exists(fileName):
         generalHash = hashlib.sha256()
         dataIndex = []
@@ -41,6 +42,7 @@ def uploadFile(fileName):
                     dataIndex.append(obj)
                     proxySocket.send_multipart(('add_file'.encode('utf'), fileName.encode('utf-8'), json.dumps(dataIndex).encode('utf-8')))
                     proxySocket.recv_string()
+                    clear()
                     print('Subida del archivo {fileName} exitosa'.format(fileName = fileName))
                 else:
                     print("No se pudo subir el archivo %s" % fileName)
@@ -54,6 +56,7 @@ def uploadFile(fileName):
                     obj['host'] = servers[iteratorServer]['host']
                     obj['sha256file'] = sha256
                     dataIndex.append(obj)
+                    clear()
                     print('Subida del archivo {fileName} parte {iterator} exitosa'.format(fileName = fileName, iterator = iterator))
                     iterator += 1
                 elif message.decode('utf-8') == 'error_file':
@@ -68,13 +71,13 @@ def uploadFile(fileName):
         raise SystemExit(1)
 
 #Peticion de listar archivos del servidor
-def listFolder():
+def listFolder(proxySocket):
     proxySocket.send_multipart(('list'.encode("utf-8"), b''))
     message = proxySocket.recv()
     print(message.decode('utf-8'))
 
 #Descarga de archivo del servidor al cliente
-def downloadFile(fileName):
+def downloadFile(fileName, proxySocket, socket):
     proxySocket.send_multipart(('download'.encode('utf-8'), fileName.encode('utf-8')))
     files = json.loads(proxySocket.recv_json())
     generalHash = hashlib.sha256()
@@ -93,27 +96,35 @@ def downloadFile(fileName):
                 sha256 = hashlib.sha256(content).hexdigest()
                 generalHash.update(content)
                 if sha256 == response[1].decode('utf-8'):
+                    clear()
                     print("Descarga del archivo {title} exitosa parte {index}/{length}".format(title = fileName, index = files.index(file) + 1, length = len(files) - 1))
                 else:
                     print("El archivo %s no existe en el servidor" % fileName)
             else:
                 if generalHash.hexdigest() == file['sha256file']:
+                    clear()
                     print("Descarga del archivo exitosa")
                 else:
                     print("Archivo corrupto")
 
-if len(sys.argv) < 2:
-    sys.stderr.write("Se debe usar: python client.py [accion] [nombre_archivo]")
-    raise SystemExit(1)
+def main():
+    context = zmq.Context()
+    socket = context.socket(zmq.REQ)
+    proxySocket = zmq.Context().socket(zmq.REQ)
+    proxySocket.connect("tcp://localhost:8888")
+    if len(sys.argv) < 2:
+        sys.stderr.write("Se debe usar: python client.py [accion] [nombre_archivo]")
+        raise SystemExit(1)
+    accion = sys.argv[1]
+    fileName = None
+    if len(sys.argv) == 3:
+        fileName = sys.argv[2]
+    if accion == 'upload':
+        uploadFile(fileName, proxySocket, socket)
+    elif accion == 'list':
+        listFolder(proxySocket)
+    elif accion == 'download':
+        downloadFile(fileName, proxySocket, socket)
 
-accion = sys.argv[1]
-fileName = None
-
-if len(sys.argv) == 3:
-    fileName = sys.argv[2]
-if accion == 'upload':
-    uploadFile(fileName)
-elif accion == 'list':
-    listFolder()
-elif accion == 'download':
-    downloadFile(fileName)
+if __name__ == "__main__":
+    main()
