@@ -6,13 +6,10 @@ import hashlib
 
 #head -c 1G </dev/urandom >myfile
 
-context = zmq.Context()
-socket = context.socket(zmq.REQ)
-socket.connect("tcp://localhost:5555")
 PS = 1024*1024*2
 
 #Subida de archivo al servidor
-def uploadFile(fileName):
+def uploadFile(fileName, socket):
     if os.path.exists(fileName):
         generalHash = hashlib.sha256()
         file = open(fileName, 'rb')
@@ -24,6 +21,7 @@ def uploadFile(fileName):
                 socket.send_multipart(('upload'.encode("utf-8"), fileName.encode("utf-8"), b'', generalHash.hexdigest().encode('utf-8'), str(iterator).encode('utf-8')))
                 message = socket.recv()
                 if message.decode('utf-8') == 'ok':
+                    os.system('cls')
                     print('Subida del archivo {fileName} exitosa'.format(fileName = fileName))
                 else:
                     print("No se pudo subir el archivo %s" % fileName)
@@ -47,13 +45,20 @@ def uploadFile(fileName):
         raise SystemExit(1)
 
 #Peticion de listar archivos del servidor
-def listFolder():
+def listFolder(socket):
     socket.send_multipart(('list'.encode("utf-8"), b''))
     message = socket.recv()
     print(message.decode('utf-8'))
 
+
+def clear(): 
+    if os.name == 'nt': 
+        _ = os.system('cls') 
+    else: 
+        _ = os.system('clear') 
+
 #Descarga de archivo del servidor al cliente
-def downloadFile(fileName):
+def downloadFile(fileName,socket):
     socket.send_multipart(('download'.encode('utf-8'), fileName.encode('utf-8'), ''.encode('utf-8')))
     length = int(socket.recv().decode('utf-8'))
     generalHash = hashlib.sha256()
@@ -73,10 +78,12 @@ def downloadFile(fileName):
                     sha256 = hashlib.sha256(content).hexdigest()
                     generalHash.update(content)
                     if sha256 == response[2].decode('utf-8'):
+                        clear()
                         print("Descarga del archivo {title} exitosa parte {index}/{length}".format(title = title, index = index + 1, length = length - 1))
                     else:
                         print("El archivo %s no existe en el servidor" % fileName)
                 else:
+                    clear()
                     print('Descarga del archivo %s exitosa' % fileName)
             else:
                 if generalHash.hexdigest() == response[2].decode('utf-8'):
@@ -84,18 +91,23 @@ def downloadFile(fileName):
                 else:
                     print("El archivo %s no existe en el servidor" % fileName)
 
-if len(sys.argv) < 2:
-    sys.stderr.write("Se debe usar: python client.py [accion] [nombre_archivo]")
-    raise SystemExit(1)
+def main():
+    context = zmq.Context()
+    socket = context.socket(zmq.REQ)
+    socket.connect("tcp://localhost:5555")
+    if len(sys.argv) < 2:
+        sys.stderr.write("Se debe usar: python client.py [accion] [nombre_archivo]")
+        raise SystemExit(1)
+    accion = sys.argv[1]
+    fileName = None
+    if len(sys.argv) == 3:
+        fileName = sys.argv[2]
+    if accion == 'upload':
+        uploadFile(fileName, socket)
+    elif accion == 'list':
+        listFolder(socket)
+    elif accion == 'download':
+        downloadFile(fileName, socket)
 
-accion = sys.argv[1]
-fileName = None
-
-if len(sys.argv) == 3:
-    fileName = sys.argv[2]
-if accion == 'upload':
-    uploadFile(fileName)
-elif accion == 'list':
-    listFolder()
-elif accion == 'download':
-    downloadFile(fileName)
+if __name__ == "__main__":
+    main()
