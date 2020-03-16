@@ -1,3 +1,5 @@
+import numpy as np
+
 M = 256   
 
 """
@@ -11,7 +13,7 @@ def binaryString(string):
             b = '0' + b
         binarystring = binarystring + b
     return binarystring + '1'
-
+256256
 """
 Añade ceros al final de la cadena para completar la longitud M*2
 """
@@ -35,6 +37,16 @@ def parseMessage(binaryText):
         print(binaryText[item:int(item+(M/8))])
         print(i)
         i += 1
+
+def getInitialHashes():
+    primeNumbers = [2, 3, 5, 7, 11, 13, 17, 19]
+    hashes = []
+    for prime in primeNumbers:
+        sqrt = str(int(str(np.sqrt(prime)).split('.')[1], 10) * pow(2, (M/8))).replace('.', '')
+        print(sqrt)
+        binary = ''
+        print(hex(int(sqrt[: 10], 10)))
+            
         
 def main():
     print("Ingresa la cadena:")
@@ -42,6 +54,7 @@ def main():
     binText = kZero(text)
     print("Cadena binaria %s" % binText)
     parseMessage(binText)
+    getInitialHashes()
 
 if __name__ == '__main__':
     main()
