@@ -1,35 +1,25 @@
 import zmq
-import os
-import hashlib
 import sys
-import json
 import random
 import string
-import socket
-import getmac
-import copy
+import uuid
+import hashlib
+import os
+import json
 
-class Node:
-
-    def __init__(self, host, ident, next):
-        self.host = host
-        self.ident = ident
-        self.next = next
-
-#Get ip 
-def getIp(): 
+def getMac(): 
     try: 
-        hostIp = socket.gethostbyname(socket.getfqdn()) 
-        return hostIp
+        mac = uuid.getnode()
+        return mac
     except: 
-        print("Unable to get Hostname and IP") 
+        print("Unable to get MAC") 
 
 def getDistributedString():
     chars = []
     chars.extend(string.ascii_lowercase)
     chars.extend(string.ascii_uppercase)
     chars.extend(string.digits)
-    return getmac.get_mac_address() + ''.join(random.choice(chars) for x in range(25))
+    return str(getMac()) + ''.join(random.choice(chars) for x in range(25))
 
 def hashString(string):
     return hashlib.sha256(string.encode()).hexdigest()[:8]
@@ -37,102 +27,313 @@ def hashString(string):
 def integerHash(hash):
     return int(hash, 16)
 
-def initializeNode(port, serverSocket, rango):
-    serverSocket.bind("tcp://*:{}".format(port))
-    ident = integerHash(hashString(getDistributedString()))
-    rango = [0, ident, ident, pow(2, 256)]
-    print(rango)
-    host = "tcp://{ip}:{port}".format(ip = getIp(), port = port)
-    print("Inicializando nodo con id: %s" % ident)
-    return Node(host, ident, Node(host, ident, None))
+class Node:
 
+    def __init__(self, ip, port):
+        self.IDENT = integerHash(hashString(getDistributedString()))
+        self.ip = ip
+        self.port = port
+        self.socket = zmq.Context().socket(zmq.REP)
+        self.next = None
+        self.previous = None
+        self.range = [None, None]
+        self.host = "{ip}:{port}".format(ip=self.ip, port=self.port)
 
-def receiveRequestConnection(connectingHost, idHost, serverSocket, node, rango):
-    idHost = int(idHost, 10)
-    if idHost > node.ident:
-        if node.next.ident <= node.ident:
-            nextNode = copy.deepcopy(node.next)
-            node.next.ident = idHost
-            node.next.host = connectingHost
-            print(len(rango))
-            rango[len(rango) - 2] = idHost
-            print(rango)
-            serverSocket.send_multipart(('next'.encode('utf-8'), nextNode.host.encode('utf-8'), str(nextNode.ident).encode('utf-8')))
+    def download(self, fileName):
+        try:
+            nameId = int(fileName, 16)
+        except ValueError:
+            self.socket.send_multipart(('Nombre incorrecto'.encode('utf-8')))
+        if self.range[0] >= self.range[1]:
+            if self.range[0] < nameId or nameId <= self.range[1]:
+                if os.path.isfile("uploadedFiles/%s" % fileName):
+                    file = open("uploadedFiles/%s" % fileName, 'rb')
+                    data = file.read()
+                    self.socket.send_multipart(('found'.encode('utf-8'), data, hashlib.sha256(data).hexdigest().encode('utf-8')))
+                else:
+                    self.socket.send_multipart(('notfound'.encode('utf-8')))
+            else:
+                if nameId > self.range[1]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.next.encode('utf-8')))
+                elif nameId <= self.range[0]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.previous.encode('utf-8')))
         else:
-            serverSocket.send_multipart(('question'.encode('utf-8'), node.next.host.encode('utf-8')))
-    else:
-        nextNode = copy.deepcopy(node.next)
-        node.next.ident = idHost
-        node.next.host = connectingHost
-        serverSocket.send_multipart(('next'.encode('utf-8'), nextNode.host.encode('utf-8'), str(nextNode.ident).encode('utf-8')))
-    print(node.next.ident)
+            if self.range[0] < nameId <= self.range[1]:
+                if os.path.exists("uploadedFiles/%s" % fileName):
+                    file = open("uploadedFiles/%s" % fileName, 'rb')
+                    data = file.read()
+                    self.socket.send_multipart(('found'.encode('utf-8'), data, hashlib.sha256(data).hexdigest().encode('utf-8')))
+                else:
+                    self.socket.send_multipart(('notfound'.encode('utf-8')))
+            else:
+                if nameId > self.range[1]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.next.encode('utf-8')))
+                elif nameId <= self.range[0]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.previous.encode('utf-8')))
+    
+    def downloadIndex(self, fileName):
+        try:
+            nameId = int(fileName, 16)
+        except ValueError:
+            self.socket.send_multipart(('Nombre incorrecto'.encode('utf-8')))
+        if self.range[0] >= self.range[1]:
+            if self.range[0] < nameId or nameId <= self.range[1]:
+                if os.path.isfile("uploadedFiles/%s.json" % fileName):
+                    file = open("uploadedFiles/%s.json" % fileName, 'r')
+                    data = file.read()
+                    self.socket.send_multipart(('found'.encode('utf-8'), data.encode('utf-8')))
+                else:
+                    self.socket.send_multipart(('notfound'.encode('utf-8')))
+            else:
+                if nameId > self.range[1]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.next.encode('utf-8')))
+                elif nameId <= self.range[0]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.previous.encode('utf-8')))
+        else:
+            if self.range[0] < nameId <= self.range[1]:
+                if os.path.exists("uploadedFiles/%s.json" % fileName):
+                    file = open("uploadedFiles/%s.json" % fileName, 'r')
+                    data = file.read()
+                    self.socket.send_multipart(('found'.encode('utf-8'), data.encode('utf-8')))
+                else:
+                    self.socket.send_multipart(('notfound'.encode('utf-8')))
+            else:
+                if nameId > self.range[1]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.next.encode('utf-8')))
+                elif nameId <= self.range[0]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.previous.encode('utf-8')))
 
-def receiveRequestDisconnect(idHost, nextId, nextHost, serverSocket, node):
-    idHost = int(idHost, 10)
-    nextId = int(nextId, 10)
-    if node.next.ident == idHost:
-        node.next.ident = nextId
-        node.next.host = nextHost
-        print(node.next.ident)
-        serverSocket.send_multipart(('ok'.encode('utf-8'), ''.encode('utf-8')))
-    else:
-        print('disconnect %s' % node.next.host)
-        serverSocket.send_multipart(('question'.encode('utf-8'), node.next.host.encode('utf-8')))
+    def transferFiles(self, name):
+        if os.path.isfile("uploadedFiles/%s" % name):
+            data = open("uploadedFiles/%s" % name, "rb").read()
+            sha = hashlib.sha256(data).hexdigest()
+            self.socket.send_multipart(('ok'.encode('utf-8'), sha.encode('utf-8'), data))
+        else:
+            self.socket.send_multipart(('notfound'.encode('utf-8'), 'No existe el archivo'.encode('utf-8')))
 
-def disconnectNode(socketConnection, node):
-    print(node.next.host)
-    if node.ident != node.next.ident:
-        socketConnection.connect("tcp://{}".format(node.next.host))
-        socketConnection.send_multipart(('disconnect'.encode('utf-8'), str(node.ident).encode('utf-8'), str(node.next.ident).encode('utf-8'), node.next.host.encode('utf-8')))
-        message = socketConnection.recv_multipart()
-        while message[0].decode('utf-8') == 'question':
-            socketConnection.connect("tcp://{}".format(message[1].decode('utf-8')))
-            socketConnection.send_multipart(('disconnect'.encode('utf-8'), str(node.ident).encode('utf-8'), str(node.next.ident).encode('utf-8'), node.next.host.encode('utf-8')))
-            message = socketConnection.recv_multipart()
+    def uploadFile(self, fileName):
+        try:
+            nameId = int(fileName, 16)
+        except ValueError:
+            self.socket.send_multipart(('Nombre incorrecto'.encode('utf-8')))
+        if self.range[0] >= self.range[1]:
+            if self.range[0] < nameId or nameId <= self.range[1]:
+                self.socket.send_multipart(('ok'.encode('utf-8'), self.host.encode('utf-8')))
+                message = self.socket.recv_multipart()
+                if hashlib.sha256(message[0]).hexdigest() == message[1].decode('utf-8'):
+                    file = open("uploadedFiles/%s" % message[1].decode('utf-8'), 'wb')
+                    file.write(message[0])
+                    file.close()
+                    self.socket.send_string('ok')
+                else:
+                    self.socket.send_string('badfile')
+            else:
+                if nameId > self.range[1]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.next.encode('utf-8')))
+                elif nameId <= self.range[0]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.previous.encode('utf-8')))
+        else:
+            if self.range[0] < nameId <= self.range[1]:
+                self.socket.send_multipart(('ok'.encode('utf-8'), self.host.encode('utf-8')))
+                message = self.socket.recv_multipart()
+                if hashlib.sha256(message[0]).hexdigest() == message[1].decode('utf-8'):
+                    file = open("uploadedFiles/%s" % message[1].decode('utf-8'), 'wb')
+                    file.write(message[0])
+                    file.close()
+                    self.socket.send_string('ok')
+                else:
+                    self.socket.send_string('badfile')
+            else:
+                if nameId > self.range[1]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.next.encode('utf-8')))
+                elif nameId <= self.range[0]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.previous.encode('utf-8')))
 
-def sendRequestConnection(hostConnect, port, serverSocket, socketConnection):
-    serverSocket.bind("tcp://*:{}".format(port))
-    socketConnection.connect("tcp://{}".format(hostConnect))
-    host = "{h}:{p}".format(h = getIp(), p = port)
-    ident = integerHash(hashString(getDistributedString()))
-    print(ident)
-    socketConnection.send_multipart(('connect'.encode('utf-8'), host.encode('utf-8'), str(ident).encode('utf-8')))
-    message = socketConnection.recv_multipart()
-    while(message[0].decode('utf-8') == 'question'):
-        socketConnection.connect("tcp://{}".format(message[1].decode('utf-8')))
-        host = "{h}:{p}".format(h = getIp(), p = port)
-        socketConnection.send_multipart(('connect'.encode('utf-8'), host.encode('utf-8'), str(ident).encode('utf-8')))
-        message = socketConnection.recv_multipart()
-    print(message[2].decode('utf-8'))
-    return Node(host, ident, Node(message[1].decode('utf-8'), int(message[2].decode('utf-8'), 10), None))
+
+    def uploadIndex(self, fileName):
+        print('Entro index')
+        try:
+            nameId = int(fileName, 16)
+        except ValueError:
+            self.socket.send_multipart(('Nombre incorrecto'.encode('utf-8')))
+        if self.range[0] >= self.range[1]:
+            if self.range[0] < nameId or nameId <= self.range[1]:
+                self.socket.send_multipart(('ok'.encode('utf-8'), self.host.encode('utf-8')))
+                message = self.socket.recv_json()
+                file = open("uploadedFiles/%s.json" % fileName, 'w')
+                file.write(message)
+                file.close()
+                self.socket.send_string('ok')
+            else:
+                if nameId > self.range[1]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.next.encode('utf-8')))
+                elif nameId <= self.range[0]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.previous.encode('utf-8')))
+        else:
+            if self.range[0] < nameId <= self.range[1]:
+                self.socket.send_multipart(('ok'.encode('utf-8'), self.host.encode('utf-8')))
+                message = self.socket.recv_json()
+                file = open("uploadedFiles/%s.json" % fileName, 'w')
+                file.write(message)
+                file.close()
+                self.socket.send_string('ok')
+            else:
+                if nameId > self.range[1]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.next.encode('utf-8')))
+                elif nameId <= self.range[0]:
+                    self.socket.send_multipart(('question'.encode('utf-8'), self.previous.encode('utf-8')))
+        
+    def connectingServer(self, address, nodeAddress):
+        d = {
+            "action": "connect",
+            "address": address,
+            "id": self.IDENT
+        }
+        r = {
+            "action": "next",
+            "next": nodeAddress
+        }
+        while True:
+            server = zmq.Context().socket(zmq.REQ)
+            server.connect(r["next"])
+            server.send_json(d)
+            r = server.recv_json()
+            if r["state"] == "ok":
+                self.previous = r["previous"]
+                self.next = r["next"]
+                self.range[0] = r["lowestHash"]
+                self.range[1] = self.IDENT
+                server.close()
+                break;
+            else:
+                server.close()
+        transactionSocket = zmq.Context().socket(zmq.REQ)
+        transactionSocket.connect(self.next)
+        for file in r["files"]:
+            d = {
+                "action": "transferServer",
+                "name": file
+            }
+            transactionSocket.send_json(d)
+            message = transactionSocket.recv_multipart()
+            if message[0].decode('utf-8') == "ok":
+                if message[1].decode('utf-8') == file:
+                    fwrite = open("uploadedFiles/%s" % file, "wb")
+                    fwrite.write(message[2])
+                    fwrite.close()
+                    print("Transfering file %s" % file)
+                else:
+                    print("Corrupted file")
+            else:
+                print("Connection error")
+
+    def addServer(self, nodeAddress, nodeId):
+        d = {"files":[]}
+        if self.range[0] >= self.range[1]:
+            if self.range[0] < nodeId or nodeId <= self.range[1]:
+                for file in os.listdir("uploadedFiles"):
+                    idFile = int(file, 16)
+                    if idFile > self.range[0] and idFile <= nodeId and nodeId > self.range[0]:
+                        d["files"].append(file)
+                    elif (idFile <= self.range[1] or idFile > self.range[0]) and (nodeId < self.range[1]):
+                        d["files"].append(file)
+                d["state"] = "ok"
+                d["lowestHash"] = self.range[0]
+                self.range[0] = nodeId
+                if self.next != None and self.previous != None:
+                    d["next"] = "tcp://%s" % self.host
+                    d["previous"] = self.previous
+                    sc = zmq.Context().socket(zmq.REQ)
+                    sc.connect(self.previous)
+                    data = {
+                        "action": "next",
+                        "address": nodeAddress
+                    }
+                    sc.send_json(data)
+                    message = sc.recv()
+                    if message.decode('utf-8') == "ok":
+                        print("Next server updating {ident} con ip {address}".format(ident= nodeId, address= nodeAddress))
+                    sc.close()
+                    self.previous = nodeAddress
+                else:
+                    d["next"] = "tcp://%s" % self.host
+                    d["previous"] = "tcp://%s" % self.host
+                    self.next = nodeAddress
+                    self.previous = nodeAddress
+            else:
+                d["state"] = "next"
+                if nodeId > self.range[1]:
+                    d["next"] = self.next
+                elif nodeId <= self.range[0]:
+                    d["next"] = self.previous
+        else:
+            if self.range[0] < nodeId <= self.range[1]:
+                for file in os.listdir("uploadedFiles"):
+                    idFile = int(file, 16)
+                    if idFile <= nodeId:
+                        d["files"].append(file)
+                d["state"] = "ok"
+                d["lowestHash"] = self.range[0]
+                self.range[0] = nodeId
+                d["next"] = "tcp://%s" % self.host
+                d["previous"] = self.previous
+                sc = zmq.Context().socket(zmq.REQ)
+                sc.connect(self.previous)
+                data = {
+                    "action": "next",
+                    "address": nodeAddress
+                }
+                sc.send_json(data)
+                message = sc.recv()
+                if message.decode('utf-8') == "ok":
+                    print("Nodo {ident} conectado con ip {ip}".format(ident= nodeId, ip=nodeAddress))
+                sc.close()
+                self.previous = nodeAddress
+            else:
+                d["state"] = "next"
+                if nodeId > self.range[1]:
+                    d["next"] = self.next
+                elif nodeId <= self.range[0]:
+                    d["next"] = self.previous
+        self.socket.send_json(d)
 
 def main():
-    serverSocket = zmq.Context().socket(zmq.REP)
-    socketConnection = zmq.Context().socket(zmq.REQ)
-    node = None
-    rango = []
+    ip = sys.argv[1]
+    port = sys.argv[2]
+    node = Node(ip, port)
     if not os.path.exists("uploadedFiles"):
-        os.mkdir("uploadedFiles")    
-    if len(sys.argv) == 2:
-        node = initializeNode(sys.argv[1], serverSocket, rango)
+        os.mkdir("uploadedFiles")
+    if len(sys.argv) == 3:
+        node.range[0] = node.IDENT
+        node.range[1] = node.IDENT
     elif len(sys.argv) == 4:
-        if sys.argv[2] == 'connect':
-            node = sendRequestConnection(sys.argv[3], sys.argv[1], serverSocket, socketConnection)
-    print(node)
+        node.connectingServer("tcp://{ip}:{port}".format(ip=ip, port=port), "tcp://{}".format(sys.argv[3]))
+    else:
+        sys.stderr.write("Para inicializar el nodo principal: python node.py [ip] [port]\nPara agregar nodo: python node.py [ip] [port] [ip_connect:port_connect]")
+        raise SystemExit(1)
+    node.socket.bind("tcp://*:%s" % port)
+    print(node.IDENT)
     while True:
-        try:
-            message = serverSocket.recv_multipart()
-            print(message)
-            action = message[0].decode('utf-8')
-            if action == 'connect':
-                receiveRequestConnection(message[1].decode('utf-8'), message[2].decode('utf-8'), serverSocket, node, rango)
-            elif action == 'disconnect':
-                receiveRequestDisconnect(message[1].decode('utf-8'), message[2].decode('utf-8'), message[3].decode('utf-8'), serverSocket, node)
-            elif action == 'ok':
-                serverSocket.send_multipart(('ok'.encode('utf-8'), ''.encode('utf-8')))
-        except KeyboardInterrupt:
-            disconnectNode(socketConnection, node)
-            sys.exit()
-
-if __name__ == "__main__":
-    main()
+        print(node.next)
+        message = node.socket.recv_json()
+        if message["action"] == "connect":
+            node.addServer(message["address"], message["id"])
+        elif message["action"] == "previous":
+            node.previous = message["address"]
+            node.socket.send("ok".encode("utf-8"))
+            print(node.previous)
+        elif message["action"] == "next":
+            node.next = message["address"]
+            node.socket.send("ok".encode("utf-8"))
+            print(node.next)
+        elif message["action"] == "upload":
+            node.uploadFile(message["name"])
+        elif message["action"] == "download":
+            node.download(message["name"])
+        elif message["action"] == "transferServer":
+            node.transferFiles(message["name"])
+        elif message["action"] == "uploadIndex":
+            node.uploadIndex(message["name"])
+        elif message["action"] == "downloadIndex":
+            node.downloadIndex(message["name"])
+main()
