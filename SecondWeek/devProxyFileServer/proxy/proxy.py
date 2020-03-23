@@ -32,6 +32,7 @@ def loadIndex():
 
 #Retorna la lista de archivos que existe en el servidor
 def listFolder(index, socket):
+    index = loadIndex()
     items = 'Archivos en el servidor:'
     for x in index.keys():
         items = items + '\n' + x
