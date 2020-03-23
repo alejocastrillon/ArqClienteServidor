@@ -67,6 +67,7 @@ def registryServer(host, indexServers, socket):
             file = open('indexservers.json', 'w')
             json.dump(indexServers, file)
         socket.send_string('ok')
+        print("Servidor conectado %s" % host)
     else:
         socket.send_string('error')
 

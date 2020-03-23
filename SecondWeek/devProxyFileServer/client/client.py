@@ -111,14 +111,14 @@ def main():
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
     proxySocket = zmq.Context().socket(zmq.REQ)
-    proxySocket.connect("tcp://localhost:8888")
-    if len(sys.argv) < 2:
-        sys.stderr.write("Se debe usar: python client.py [accion] [nombre_archivo]")
+    proxySocket.connect("tcp://{}:8888".format(sys.argv[1]))
+    if len(sys.argv) < 3:
+        sys.stderr.write("Se debe usar: python client.py [hostProxy] [accion] [nombre_archivo]")
         raise SystemExit(1)
-    accion = sys.argv[1]
+    accion = sys.argv[2]
     fileName = None
-    if len(sys.argv) == 3:
-        fileName = sys.argv[2]
+    if len(sys.argv) == 4:
+        fileName = sys.argv[3]
     if accion == 'upload':
         uploadFile(fileName, proxySocket, socket)
     elif accion == 'list':
