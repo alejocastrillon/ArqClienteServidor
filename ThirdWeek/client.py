@@ -4,7 +4,7 @@ import json
 import os
 import hashlib
 
-PS = 1024*1024*2
+PS = 1024*1024*5
 
 def clear(): 
     if os.name == 'nt': 
@@ -115,11 +115,11 @@ def download(fileObject, ipNode):
                             fileWrite.close()
                             findPart = True
                             clear()
-                            print("Descargando archivo {name} parte {i}/{part}".format(name=index["name"], i=i, part=len(index["parts"])))
+                            print("Donwloading file {name} part {i}/{part}".format(name=index["name"], i=i, part=len(index["parts"])))
                             i += 1
                         else:
                             clear()
-                            sys.stderr.write("Archivo corrupto")
+                            sys.stderr.write("Corrupted file")
                             break;
                     else:
                         socket.disconnect(ipNode)

@@ -41,7 +41,7 @@ class Node:
 
     def download(self, fileName):
         try:
-            nameId = int(fileName, 16)
+            nameId = int(fileName[:8], 16)
         except ValueError:
             self.socket.send_multipart(('Nombre incorrecto'.encode('utf-8')))
         if self.range[0] >= self.range[1]:
@@ -64,7 +64,8 @@ class Node:
                     data = file.read()
                     self.socket.send_multipart(('found'.encode('utf-8'), data, hashlib.sha256(data).hexdigest().encode('utf-8')))
                 else:
-                    self.socket.send_multipart(('notfound'.encode('utf-8')))
+                    print('No se encontro el archivo %s' % fileName)
+                    self.socket.send_multipart(('notfound'.encode('utf-8'), ''.encode('utf-8')))
             else:
                 if nameId > self.range[1]:
                     self.socket.send_multipart(('question'.encode('utf-8'), self.next.encode('utf-8')))
@@ -73,7 +74,7 @@ class Node:
     
     def downloadIndex(self, fileName):
         try:
-            nameId = int(fileName, 16)
+            nameId = int(fileName[:8], 16)
         except ValueError:
             self.socket.send_multipart(('Nombre incorrecto'.encode('utf-8')))
         if self.range[0] >= self.range[1]:
@@ -113,9 +114,10 @@ class Node:
 
     def uploadFile(self, fileName):
         try:
-            nameId = int(fileName, 16)
+            nameId = int(fileName[:8], 16)
         except ValueError:
             self.socket.send_multipart(('Nombre incorrecto'.encode('utf-8')))
+        print(nameId)
         if self.range[0] >= self.range[1]:
             if self.range[0] < nameId or nameId <= self.range[1]:
                 self.socket.send_multipart(('ok'.encode('utf-8'), self.host.encode('utf-8')))
@@ -153,7 +155,7 @@ class Node:
     def uploadIndex(self, fileName):
         print('Entro index')
         try:
-            nameId = int(fileName, 16)
+            nameId = int(fileName[:8], 16)
         except ValueError:
             self.socket.send_multipart(('Nombre incorrecto'.encode('utf-8')))
         if self.range[0] >= self.range[1]:
@@ -214,6 +216,7 @@ class Node:
                 "action": "transferServer",
                 "name": file
             }
+            print(file)
             transactionSocket.send_json(d)
             message = transactionSocket.recv_multipart()
             if message[0].decode('utf-8') == "ok":
@@ -232,7 +235,7 @@ class Node:
         if self.range[0] >= self.range[1]:
             if self.range[0] < nodeId or nodeId <= self.range[1]:
                 for file in os.listdir("uploadedFiles"):
-                    idFile = int(file, 16)
+                    idFile = int(file[:8], 16)
                     if idFile > self.range[0] and idFile <= nodeId and nodeId > self.range[0]:
                         d["files"].append(file)
                     elif (idFile <= self.range[1] or idFile > self.range[0]) and (nodeId < self.range[1]):
@@ -253,6 +256,32 @@ class Node:
                     message = sc.recv()
                     if message.decode('utf-8') == "ok":
                         print("Next server updating {ident} con ip {address}".format(ident= nodeId, address= nodeAddress))
+                        socket = zmq.Context().socket(zmq.REQ)
+                        for file in d["files"]:
+                            d = {
+                                "action": "upload",
+                                "name": file
+                            }
+                            print(file)
+                            ipNode = nodeAddress
+                            print(nodeAddress)
+                            socket.connect(ipNode)
+                            f = open("uploadedFiles/%s" % file)
+                            dataFile = f.read()
+                            socket.send_json(d)
+                            message = socket.recv_multipart()
+                            send = False
+                            while not send:
+                                if message[0].decode('utf-8') == "ok":
+                                    socket.send_multipart((dataFile, file.encode('utf-8')))
+                                    socket.recv()
+                                    send = True
+                                else:
+                                    socket.disconnect(ipNode)
+                                    ipNode = message[1].decode('utf-8')
+                                    socket.connect(ipNode)
+                                    socket.send_json(d)
+                                    message = socket.recv_multipart()
                     sc.close()
                     self.previous = nodeAddress
                 else:
@@ -269,7 +298,7 @@ class Node:
         else:
             if self.range[0] < nodeId <= self.range[1]:
                 for file in os.listdir("uploadedFiles"):
-                    idFile = int(file, 16)
+                    idFile = int(file[:8], 16)
                     if idFile <= nodeId:
                         d["files"].append(file)
                 d["state"] = "ok"
