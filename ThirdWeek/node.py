@@ -256,32 +256,6 @@ class Node:
                     message = sc.recv()
                     if message.decode('utf-8') == "ok":
                         print("Next server updating {ident} con ip {address}".format(ident= nodeId, address= nodeAddress))
-                        socket = zmq.Context().socket(zmq.REQ)
-                        for file in d["files"]:
-                            d = {
-                                "action": "upload",
-                                "name": file
-                            }
-                            print(file)
-                            ipNode = nodeAddress
-                            print(nodeAddress)
-                            socket.connect(ipNode)
-                            f = open("uploadedFiles/%s" % file)
-                            dataFile = f.read()
-                            socket.send_json(d)
-                            message = socket.recv_multipart()
-                            send = False
-                            while not send:
-                                if message[0].decode('utf-8') == "ok":
-                                    socket.send_multipart((dataFile, file.encode('utf-8')))
-                                    socket.recv()
-                                    send = True
-                                else:
-                                    socket.disconnect(ipNode)
-                                    ipNode = message[1].decode('utf-8')
-                                    socket.connect(ipNode)
-                                    socket.send_json(d)
-                                    message = socket.recv_multipart()
                     sc.close()
                     self.previous = nodeAddress
                 else:
