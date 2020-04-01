@@ -137,6 +137,7 @@ def download(fileObject, ipNode):
         else:
             socket.disconnect(ipNode)
             ipNode = message[1].decode('utf-8')
+            print(ipNode)
             socket.connect(ipNode)
             socket.send_json(d)
             message = socket.recv_multipart()

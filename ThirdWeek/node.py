@@ -229,6 +229,7 @@ class Node:
                     print("Corrupted file")
             else:
                 print("Connection error")
+        transactionSocket.disconnect(self.next)
 
     def addServer(self, nodeAddress, nodeId):
         d = {"files":[]}
