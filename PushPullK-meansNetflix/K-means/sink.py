@@ -13,7 +13,7 @@ class Sink:
 
     def start(self):
         while True:
-            message = self.receiver.recv_json()
+            message = self.recv.recv_json()
             if 'finished' in message:
                 return
             if 'totalTasks' in message:
