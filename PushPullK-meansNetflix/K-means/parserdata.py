@@ -4,7 +4,7 @@ with open("users.json", "r") as fu:
 print("Usuarios cargados")
 ratings = [None for _ in range(len(users))]
 movie = 0
-with open("../combined_data_1.txt", "r") as file:
+with open("combined_data_1.txt", "r") as file:
     for line in file:
         line = line[:-1]
         if line[-1] == ":":
