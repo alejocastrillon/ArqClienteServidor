@@ -18,7 +18,7 @@ class Sink:
                 return
             if 'totalTasks' in message:
                 self.clusters = message['clusters']
-                assign = [{'dataset': [], 'inertia': 0} for i in range(self.cluster)]
+                assign = [{'dataset': [], 'inertia': 0} for i in range(self.clusters)]
             for task in range(message['totalTasks']):
                 response = self.recv.recv_json()
                 messageClus = response['assign']
