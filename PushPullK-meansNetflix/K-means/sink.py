@@ -24,7 +24,7 @@ class Sink:
                 messageClus = response['assign']
                 part = response['part']
                 for c in range(len(messageClus)):
-                    for p in messageClus[c].pop('points'):
+                    for p in messageClus[c].pop('dataset'):
                         assign[c]['dataset'].append(p+(part*message['numberTasks']))
                     assign[c]['inertia'] += messageClus[c].pop('inertia')
                     for p in messageClus[c]:
