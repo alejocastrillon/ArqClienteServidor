@@ -17,7 +17,7 @@ class Sink:
             if 'finished' in message:
                 return
             if 'totalTasks' in message:
-                self.cluster = message['clusters']
+                self.clusters = message['clusters']
                 assign = [{'dataset': [], 'inertia': 0} for i in range(self.cluster)]
             for task in range(message['totalTasks']):
                 response = self.recv.recv_json()
@@ -41,7 +41,7 @@ class Sink:
             })
 
     def newAssignment(self, newClusters):
-        clus = [{} for i in range(self.clus)]
+        clus = [{} for i in range(self.clusters)]
         for c in range(len(newClusters)):
             clus[c]['dataset'] = newClusters[c].pop("dataset")
             clus[c]['inertia'] = newClusters[c].pop('inertia')
