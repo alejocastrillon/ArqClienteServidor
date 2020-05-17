@@ -1,15 +1,12 @@
 import zmq
 import math
+import numpy as np
 
 def calculateNorm(d):
     n = [None for _ in range(len(d))]
     count = 0
     for i in d:
         value = 0
-        if 'dataset' in i:
-            i.pop('dataset')
-        if 'inertia' in i:
-            i.pop('inertia')
         for j in i:
             value += pow(i[j], 2)
         n[count] = math.sqrt(value)
@@ -29,43 +26,44 @@ class Worker:
         while True:
             message = self.ventilator.recv_json()
             data = self.readFile(message['part'])
-            resultAssign = self.assignment(data, message['clusters'])
-            self.sink.send_json({'assign': resultAssign, 'part': message['part']})
+            self.nFeatures = int(message['nFeatures'])
+            sumPoints, inertias, sizes = self.assignment(data, message['clusters'], message['normaClusters'])
+            self.sink.send_json({
+                'sumPoints': np.ndarray.tolist(sumPoints), 
+                'inertias': inertias,
+                'sizes': sizes,
+                'part': message['part']
+            })
 
-    def assignment(self, data, clusters):
-        matrixWorker = [{'dataset': [], 'inertia': 0} for _ in range(len(clusters))]
+    def assignment(self, data, clusters, normaClusters):
+        inertias = [0] * len(clusters)
+        sizes = [0] * len(clusters)
+        sumPoints = np.zeros((len(clusters), self.nFeatures + 1))
         pointsNorm = calculateNorm(data)
-        clustersNorm = calculateNorm(clusters)
-        print(clustersNorm)
         for p, point in enumerate(data):
-            positionCluster = 0
-            miniDistance = 0.0-2.0
+            positionCluster = None
+            miniDistance = np.inf
             for j, cluster in enumerate(clusters):
-                distance = self.coss(point, cluster, pointsNorm[p], clustersNorm[j])
-                if distance > miniDistance:
+                distance = self.coss(point, cluster, pointsNorm[p], normaClusters[j])
+                if distance < miniDistance:
                     positionCluster = j
                     miniDistance = distance
             for value in point:
-                ass = matrixWorker[positionCluster].get(value)
-                if ass:
-                    matrixWorker[positionCluster][value][0] += point[value]
-                    matrixWorker[positionCluster][value][1] += 1
-                else:
-                    matrixWorker[positionCluster][value] = [point[value], 1]
-            matrixWorker[positionCluster]['dataset'].append(p)
-            if miniDistance > 1:
-                miniDistance = 1
-            #print(f"Distance {miniDistance} ->Arccos {math.acos(miniDistance)}")
-            matrixWorker[positionCluster]['inertia'] += miniDistance
-        #print([f"Cluster {i} = {len(matrixWorker[i]['dataset'])}, inercia = {matrixWorker[i]['inertia']}" for i in range(len(matrixWorker))])
-        return matrixWorker
+                sumPoints[positionCluster][int(value)] += int(value)
+            sizes[positionCluster] += 1
+            inertias[positionCluster] += pow(miniDistance, 2)
+        return (sumPoints, inertias, sizes)
 
-    def coss(self, point, anotherPoint, normaPoint, normaAnotherPoint):
-        data = point if len(point) <= len(anotherPoint) else anotherPoint
+    def coss(self, point, centroId, normaPoint, normaCentroId):
         dot = 0
-        for key in data.keys():
-            dot += int(point.get(key, 0)) * int(anotherPoint.get(key, 0))
-        sim = dot / (normaPoint * normaAnotherPoint)
+        for key in point:
+            dot += float(point.get(key, 0)) * centroId[int(key)]
+        sim = dot / (normaPoint * normaCentroId)
+        if sim > 1:
+            sim = 1
+        elif sim < -1:
+            sim = -1
+        sim = np.arccos(sim)
         return sim
 
     def readFile(self, part):
