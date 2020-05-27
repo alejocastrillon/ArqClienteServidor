@@ -19,24 +19,23 @@ class Sink:
                 return
             if 'totalTasks' in message:
                 self.clusters = message['clusters']
-                sumPoints = None
-                inertias = [0] * self.clusters
+                self.nFeatures = message['nFeatures']
+                sumPoints = np.zeros((self.clusters, self.nFeatures + 1))
+                inertia = 0
                 sizes = [0] * self.clusters
             for task in range(message['totalTasks']):
                 response = self.recv.recv_json()
                 sumPointsTemp = np.asarray(response['sumPoints'])
-                if sumPoints.__class__.__name__ == 'NoneType':
-                    sumPoints = np.zeros(sumPointsTemp.shape)
-                inertiasTemp = response['inertias']
+                inertiaTemp = response['inertias']
                 sizesTemp = response['sizes']
+                inertia += inertiaTemp
                 for c in range(self.clusters):
                     sumPoints[c] += sumPointsTemp[c]
-                    inertias[c] += inertiasTemp[c]
                     sizes[c] += sizesTemp[c]
             clusters = self.newAssignment(sumPoints, sizes)
             self.send.send_json({
                 'clusters': clusters,
-                'inertias': inertias
+                'inertia': inertia
             })
 
     def newAssignment(self, newClusters, sizes):

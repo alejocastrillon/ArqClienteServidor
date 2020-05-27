@@ -36,7 +36,8 @@ class Worker:
             })
 
     def assignment(self, data, clusters, normaClusters):
-        inertias = [0] * len(clusters)
+        clusters = np.asarray(clusters, dtype= float)        
+        inertias = 0
         sizes = [0] * len(clusters)
         sumPoints = np.zeros((len(clusters), self.nFeatures + 1))
         pointsNorm = calculateNorm(data)
@@ -48,10 +49,10 @@ class Worker:
                 if distance < miniDistance:
                     positionCluster = j
                     miniDistance = distance
-            for value in point:
-                sumPoints[positionCluster][int(value)] += int(value)
+            for key in point.keys():
+                sumPoints[positionCluster][int(key)] += point[key]
             sizes[positionCluster] += 1
-            inertias[positionCluster] += pow(miniDistance, 2)
+            inertias += miniDistance
         return (sumPoints, inertias, sizes)
 
     def coss(self, point, centroId, normaPoint, normaCentroId):
@@ -59,10 +60,10 @@ class Worker:
         for key in point:
             dot += float(point.get(key, 0)) * centroId[int(key)]
         sim = dot / (normaPoint * normaCentroId)
-        if sim > 1:
-            sim = 1
-        elif sim < -1:
-            sim = -1
+        if abs(sim - 1.0) <= 1e-4:
+            sim = 1.0
+        elif abs(sim + 1.0) <= 1e-4:
+            sim = -1.0
         sim = np.arccos(sim)
         return sim
 
