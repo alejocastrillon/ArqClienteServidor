@@ -6,7 +6,7 @@
 
 using namespace std;
 
-vector<int> quickSortSec(vector<int> numbers) {
+vector<int> quickSortSec(vector<int>& numbers) {
     if (numbers.size() > 1) {
         int pivot = numbers[0];
         vector<int> left = {};
@@ -14,8 +14,8 @@ vector<int> quickSortSec(vector<int> numbers) {
         for (auto i : numbers) {
             i != pivot ? i < pivot ? left.push_back(i) : right.push_back(i) : void();
         }
-        vector<int> quickLeft = quickSortSec(left);
-        vector<int> quickRight = quickSortSec(right);
+        vector<int> quickLeft = quickSortSec(ref(left));
+        vector<int> quickRight = quickSortSec(ref(right));
         vector<int> result = {};
         result.insert(result.end(), quickLeft.begin(), quickLeft.end());
         result.push_back(pivot);
@@ -26,7 +26,7 @@ vector<int> quickSortSec(vector<int> numbers) {
     }
 }
 
-vector<int> quickSortParalel(vector<int> numbers) {
+vector<int> quickSortParalel(vector<int>& numbers) {
     if (numbers.size() > 1) {
         int pivot = numbers[0];
         vector<int> left = {};
@@ -34,8 +34,8 @@ vector<int> quickSortParalel(vector<int> numbers) {
         for (auto i : numbers) {
             i != pivot ? i < pivot ? left.push_back(i) : right.push_back(i) : void();
         }
-        auto futureLeft = async(launch::async, quickSortParalel, left);
-        auto futureRight = async(launch::async, quickSortParalel, right);
+        auto futureLeft = async(launch::async, quickSortParalel, ref(left));
+        auto futureRight = async(launch::async, quickSortParalel, ref(right));
         vector<int> result = {};
         vector<int> quickLeft = futureLeft.get();
         vector<int> quickRight = futureRight.get();
@@ -65,14 +65,14 @@ int main() {
         data.push_back(number);
     }
     Timer t;
-    vector<int> resultSec = quickSortSec(data);
+    vector<int> resultSec = quickSortSec(ref(data));
     cout << "Tiempo demorado secuencial: " << t.elapsed() << endl;
     getchar();
     for (auto i : resultSec){
         cout << i << endl;
     }
     Timer u;
-    vector<int> resultParalel = quickSortParalel(data);
+    vector<int> resultParalel = quickSortParalel(ref(data));
     cout << "Tiempo demorado paralelo: " << u.elapsed() << endl;
     getchar();
     for (auto i : resultParalel){
